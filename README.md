@@ -14,7 +14,7 @@ console.log(result.warnings);       // anything that couldn't be read
 
 - Compressed meshes and point clouds.
 - Positions, normals, colours (as sRGB, alpha dropped) and texture coordinates.
-- In Node, draco3d's decoder is loaded when first needed. In browsers, `createDracoDecoder(wrapperSource, wasm)` makes the decoder from the draco_wasm_wrapper.js and draco_decoder.wasm that three.js serves for its DRACOLoader.
+- In Node, draco3d's decoder is loaded when first needed. In browsers, `createDracoDecoder(wrapperSource, wasm)` makes the decoder from the draco_wasm_wrapper.js and draco_decoder.wasm that three.js serves for its DRACOLoader (Draco 1.4 or later).
 
 Generic attributes and metadata are not read. See [Formats and support](Documentation/Support.md) for the details.
 

@@ -55,8 +55,23 @@ export function loadDracoDecoder(options?: DracoModuleOptions): Promise<DracoMod
  */
 export function createDracoDecoder(wrapperSource: string, wasm: ArrayBuffer): Promise<DracoModule> {
   // Hiding Node's globals makes the wrapper take its plain path, which uses the bytes given.
-  const factory = new Function('process', 'require', 'module', 'exports', `${wrapperSource}\nreturn DracoDecoderModule;`)(undefined, undefined, undefined, undefined) as (options: object) => Promise<DracoModule>;
-  return factory({ wasmBinary: wasm });
+  const factory = new Function('process', 'require', 'module', 'exports', `${wrapperSource}\nreturn DracoDecoderModule;`)(undefined, undefined, undefined, undefined) as (options: object) => unknown;
+  // The module says when it is ready with onModuleLoaded, as three.js's DRACOLoader expects; its
+  // own `then` does not settle in every environment, and is removed so the module isn't taken for a promise.
+  return new Promise((resolve, reject) => {
+    try {
+      factory({
+        wasmBinary: wasm,
+        onModuleLoaded: (module: DracoModule & { then?: unknown }) => {
+          delete module.then;
+          resolve(module);
+        },
+        onAbort: (reason: unknown) => reject(new DracoImportError(`The Draco decoder could not start: ${String(reason)}`)),
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 function decodeAttribute(draco: DracoModule, decoder: DracoDecoder, geometry: DracoGeometry, attribute: DracoAttribute): Float32Array {
@@ -81,6 +96,10 @@ export async function loadDraco(input: ImportInput, options: DracoOptions = {}):
   const draco = options.draco ?? (await loadDracoDecoder(options.dracoOptions));
   const decoder = new draco.Decoder();
   const array = new Int8Array(main.bytes.buffer, main.bytes.byteOffset, main.bytes.byteLength);
+  if (typeof decoder.DecodeArrayToMesh !== 'function') {
+    draco.destroy(decoder);
+    throw new DracoImportError('The Draco decoder is too old: Draco 1.4 or later is needed');
+  }
   const type = decoder.GetEncodedGeometryType(array);
   const isMesh = type === draco.TRIANGULAR_MESH;
   if (!isMesh && type !== draco.POINT_CLOUD) {
